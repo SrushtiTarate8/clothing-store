@@ -1,283 +1,293 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./index.css";
 
-// ─── Banner Data (edit freely) ───────────────────────────────────────────────
-const BANNERS = [
-  {
-    id: 1,
-    tag: "LIMITED OFFER",
-    headline: "Flat 40% Off",
-    sub: "On all Women's Summer Collection",
-    cta: "Shop Women",
-    bg: "#1a1a2e",
-    accent: "#e94560",
-    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
-  },
-  {
-    id: 2,
-    tag: "NEW ARRIVALS",
-    headline: "Men's Edit 2025",
-    sub: "Premium linen, cotton & more — starting ₹799",
-    cta: "Shop Men",
-    bg: "#0f3460",
-    accent: "#e94560",
-    img: "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=600&q=80",
-  },
-  {
-    id: 3,
-    tag: "FLASH SALE",
-    headline: "Buy 2 Get 1 Free",
-    sub: "Mix & match from 500+ styles",
-    cta: "Grab the Deal",
-    bg: "#16213e",
-    accent: "#f5a623",
-    img: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&q=80",
-  },
-];
+import PromoStrip from "./components/PromoStrip";
+import HeroBanner from "./components/HeroBanner";
+import ProductCard from "./components/ProductCard";
+import Navbar from "./components/Navbar";
+import CartDrawer from "./components/CartDrawer";
+import WishlistDrawer from "./components/WishlistDrawer";
+import CategoryPage from "./pages/CategoryPage";
 
-const PROMO_MESSAGES = [
-  "🚚  Free shipping on orders above ₹999",
-  "🎉  Use code STYLE20 for extra 20% off",
-  "🔁  Easy 30-day returns — no questions asked",
-  "⭐  New arrivals every Monday — stay tuned!",
-];
-
-// ─── Countdown Hook ───────────────────────────────────────────────────────────
-function useCountdown(targetDate) {
-  const calc = () => {
-    const diff = targetDate - Date.now();
-    if (diff <= 0) return { h: 0, m: 0, s: 0 };
-    return {
-      h: Math.floor(diff / 3600000),
-      m: Math.floor((diff % 3600000) / 60000),
-      s: Math.floor((diff % 60000) / 1000),
-    };
-  };
-  const [time, setTime] = useState(calc);
-  useEffect(() => {
-    const id = setInterval(() => setTime(calc()), 1000);
-    return () => clearInterval(id);
-  }, [targetDate]);
-  return time;
-}
-
-// ─── PromoStrip ───────────────────────────────────────────────────────────────
-function PromoStrip() {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % PROMO_MESSAGES.length), 3000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="promo-strip">
-      <span key={idx} className="promo-text">{PROMO_MESSAGES[idx]}</span>
-    </div>
-  );
-}
-
-// ─── HeroBanner ──────────────────────────────────────────────────────────────
-function HeroBanner() {
-  const [active, setActive] = useState(0);
-  const timerRef = useRef(null);
-
-  // Flash sale ends in 6 hours from page load
-  const saleEnd = useRef(Date.now() + 6 * 3600 * 1000).current;
-  const { h, m, s } = useCountdown(saleEnd);
-  const pad = n => String(n).padStart(2, "0");
-
-  const goTo = (i) => {
-    setActive(i);
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => setActive(a => (a + 1) % BANNERS.length), 4500);
-  };
-
-  useEffect(() => {
-    timerRef.current = setInterval(() => setActive(a => (a + 1) % BANNERS.length), 4500);
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  const b = BANNERS[active];
-
-  return (
-    <div className="hero-banner" style={{ background: b.bg }}>
-      <div className="hero-content">
-        <span className="hero-tag" style={{ background: b.accent }}>{b.tag}</span>
-        <h1 className="hero-headline">{b.headline}</h1>
-        <p className="hero-sub">{b.sub}</p>
-
-        {/* Countdown — only on flash-sale slide */}
-        {b.tag === "FLASH SALE" && (
-          <div className="countdown">
-            <span>Ends in</span>
-            <div className="countdown-blocks">
-              {[pad(h), pad(m), pad(s)].map((v, i) => (
-                <React.Fragment key={i}>
-                  <div className="cd-block">{v}</div>
-                  {i < 2 && <span className="cd-colon">:</span>}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <button
-          className="hero-cta"
-          style={{ background: b.accent, border: "none" }}
-        >
-          {b.cta} →
-        </button>
-      </div>
-
-      <div className="hero-img-wrap">
-        <img key={b.id} src={b.img} alt={b.headline} className="hero-img" />
-      </div>
-
-      {/* Dots */}
-      <div className="hero-dots">
-        {BANNERS.map((_, i) => (
-          <button
-            key={i}
-            className={`dot ${i === active ? "dot-active" : ""}`}
-            style={i === active ? { background: b.accent } : {}}
-            onClick={() => goTo(i)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main App ─────────────────────────────────────────────────────────────────
 function App() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [activePage, setActivePage] = useState("home"); // "home" | "men" | "women" | "kids" | "home-living" | "beauty" | "studio"
+  const [sortBy, setSortBy] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     axios.get("http://localhost:8080/products")
-      .then(res => setProducts(res.data))
-      .catch(err => console.log(err));
+      .then(res => { setProducts(res.data || []); setLoading(false); })
+      .catch(err => { console.log(err); setLoading(false); });
   }, []);
 
-  // 🛒 CART FUNCTIONS
   const addToCart = (product) => {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) {
-      setCart(cart.map(item =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
-    }
+    setCart(prev => {
+      const existing = prev.find(i => i.id === product.id && i.size === product.size);
+      if (existing) {
+        return prev.map(i =>
+          i.id === product.id && i.size === product.size
+            ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
   };
 
+  const toggleWishlist = (product) => {
+    setWishlist(prev => {
+      const exists = prev.find(i => i.id === product.id);
+      if (exists) return prev.filter(i => i.id !== product.id);
+      return [...prev, product];
+    });
+  };
+
+  const isWishlisted = (id) => wishlist.some(i => i.id === id);
+
   const increaseQty = (id) =>
-    setCart(cart.map(item => item.id === id ? { ...item, quantity: item.quantity + 1 } : item));
+    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: i.quantity + 1 } : i));
 
   const decreaseQty = (id) =>
-    setCart(cart.map(item => item.id === id ? { ...item, quantity: item.quantity - 1 } : item)
-      .filter(item => item.quantity > 0));
+    setCart(prev =>
+      prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i)
+        .filter(i => i.quantity > 0)
+    );
 
-  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
+  const removeFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const totalPrice = cart.reduce((t, i) => t + i.price * i.quantity, 0);
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
-  // 🔍 FILTER
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) &&
-    (categoryFilter === "" || p.category === categoryFilter)
+  const handleNavClick = (page) => {
+    setActivePage(page);
+    setCategoryFilter("");
+    setSearch("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Category pages (non-home)
+  if (activePage !== "home") {
+    return (
+      <div>
+        <PromoStrip />
+        <Navbar
+          cartCount={cartCount}
+          setCartOpen={setCartOpen}
+          search={search}
+          setSearch={setSearch}
+          activePage={activePage}
+          onNavClick={handleNavClick}
+          wishlistCount={wishlist.length}
+          setWishlistOpen={setWishlistOpen}
+        />
+        <CartDrawer
+          cartOpen={cartOpen}
+          setCartOpen={setCartOpen}
+          cart={cart}
+          increaseQty={increaseQty}
+          decreaseQty={decreaseQty}
+          removeFromCart={removeFromCart}
+          totalPrice={totalPrice}
+        />
+        <WishlistDrawer
+          wishlistOpen={wishlistOpen}
+          setWishlistOpen={setWishlistOpen}
+          wishlist={wishlist}
+          toggleWishlist={toggleWishlist}
+          addToCart={addToCart}
+        />
+        <CategoryPage
+          category={activePage}
+          products={products}
+          addToCart={addToCart}
+          toggleWishlist={toggleWishlist}
+          isWishlisted={isWishlisted}
+          search={search}
+        />
+      </div>
+    );
+  }
+
+  // Home page
+  const CATEGORIES = [
+    { label: "All", value: "", img: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=72&q=80" },
+    { label: "Men", value: "Men", img: "https://images.unsplash.com/photo-1617127365659-c47fa864d8bc?w=72&q=80" },
+    { label: "Women", value: "Women", img: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=72&q=80" },
+    { label: "Kids", value: "Kids", img: "https://images.unsplash.com/photo-1471286174890-9c112ac6a275?w=72&q=80" },
+    { label: "Home", value: "Home", img: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=72&q=80" },
+    { label: "Beauty", value: "Beauty", img: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=72&q=80" },
+  ];
+
+  let filtered = products.filter(p =>
+    p.name?.toLowerCase().includes(search.toLowerCase()) &&
+    (categoryFilter === "" || p.category?.toLowerCase() === categoryFilter.toLowerCase())
   );
 
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  if (sortBy === "price_asc") filtered = [...filtered].sort((a, b) => a.price - b.price);
+  if (sortBy === "price_desc") filtered = [...filtered].sort((a, b) => b.price - a.price);
+  if (sortBy === "rating") filtered = [...filtered].sort((a, b) => (b.rating || 4) - (a.rating || 4));
 
   return (
     <div>
-
-      {/* 📢 PROMO STRIP */}
       <PromoStrip />
+      <Navbar
+        cartCount={cartCount}
+        setCartOpen={setCartOpen}
+        search={search}
+        setSearch={setSearch}
+        activePage={activePage}
+        onNavClick={handleNavClick}
+        wishlistCount={wishlist.length}
+        setWishlistOpen={setWishlistOpen}
+      />
+      <HeroBanner onShopNow={() => handleNavClick("women")} />
 
-      {/* 🔥 NAVBAR */}
-      <div className="navbar">
-        <h2>StyleHub</h2>
-        <div className="nav-links">
-          <span>Home</span>
-          <span>Men</span>
-          <span>Women</span>
-          <button className="cart-icon-btn" onClick={() => setCartOpen(o => !o)}>
-            🛒 {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-          </button>
-        </div>
-      </div>
+      <CartDrawer
+        cartOpen={cartOpen}
+        setCartOpen={setCartOpen}
+        cart={cart}
+        increaseQty={increaseQty}
+        decreaseQty={decreaseQty}
+        removeFromCart={removeFromCart}
+        totalPrice={totalPrice}
+      />
+      <WishlistDrawer
+        wishlistOpen={wishlistOpen}
+        setWishlistOpen={setWishlistOpen}
+        wishlist={wishlist}
+        toggleWishlist={toggleWishlist}
+        addToCart={addToCart}
+      />
 
-      {/* 🖼️ HERO BANNERS */}
-      <HeroBanner />
-
-      {/* 🛒 CART DRAWER */}
-      {cartOpen && (
-        <div className="cart-drawer">
-          <div className="cart-header">
-            <h2>Your Cart</h2>
-            <button className="close-btn" onClick={() => setCartOpen(false)}>✕</button>
-          </div>
-
-          {cart.length === 0 ? (
-            <p className="empty-cart">Your cart is empty 🛍️</p>
-          ) : (
-            cart.map(item => (
-              <div key={item.id} className="cart-item">
-                <div className="cart-item-info">
-                  <span className="cart-item-name">{item.name}</span>
-                  <span className="cart-item-price">₹{item.price}</span>
-                </div>
-                <div className="cart-item-controls">
-                  <button className="qty-btn" onClick={() => decreaseQty(item.id)}>−</button>
-                  <span className="qty-val">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => increaseQty(item.id)}>+</button>
-                  <button className="remove-btn" onClick={() => removeFromCart(item.id)}>Remove</button>
-                </div>
-              </div>
-            ))
-          )}
-
-          {cart.length > 0 && (
-            <div className="cart-footer">
-              <h3>Total: ₹{totalPrice}</h3>
-              <button className="checkout-btn">Checkout →</button>
+      {/* Trending Banners */}
+      <section className="trending-section">
+        <h2 className="trending-title">Trending Now</h2>
+        <div className="trending-grid">
+          <div className="trending-card big" onClick={() => handleNavClick("women")}>
+            <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80" alt="Women" />
+            <div className="trending-overlay">
+              <span className="trending-tag">Women</span>
+              <p>New Season Arrivals</p>
+              <button>Explore →</button>
             </div>
-          )}
+          </div>
+          <div className="trending-col">
+            <div className="trending-card" onClick={() => handleNavClick("men")}>
+              <img src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400&q=80" alt="Men" />
+              <div className="trending-overlay">
+                <span className="trending-tag">Men</span>
+                <p>Sharp & Sophisticated</p>
+                <button>Shop →</button>
+              </div>
+            </div>
+            <div className="trending-card" onClick={() => handleNavClick("kids")}>
+              <img src="https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=400&q=80" alt="Kids" />
+              <div className="trending-overlay">
+                <span className="trending-tag">Kids</span>
+                <p>Playful & Bright</p>
+                <button>Shop →</button>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+      </section>
 
-      {/* 🔍 SEARCH + FILTER */}
-      <div className="search-box">
-        <input
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="">All Categories</option>
-          <option value="Men">Men</option>
-          <option value="Women">Women</option>
-        </select>
+      {/* Special Offer Banner */}
+      <div className="offer-banner">
+        <div className="offer-content">
+          <p className="offer-eyebrow">LIMITED TIME OFFER</p>
+          <h3>Flat 40% OFF on Premium Brands</h3>
+          <p>Use code: <strong>STYLE40</strong> at checkout</p>
+          <button className="offer-btn">Grab the Deal</button>
+        </div>
+        <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80" alt="Sale" />
       </div>
 
-      {/* 🛍️ PRODUCTS */}
-      <div className="product-grid">
-        {filteredProducts.map(p => (
-          <div key={p.id} className="card">
-            <img src={p.imageUrl} alt={p.name} />
-            <h3>{p.name}</h3>
-            <p className="price">₹{p.price}</p>
-            <p>{p.category}</p>
-            <button className="btn" onClick={() => addToCart(p)}>Add to Cart</button>
+      {/* Category Chips */}
+      <div className="category-chips">
+        {CATEGORIES.map(c => (
+          <div
+            key={c.value}
+            className={`chip ${categoryFilter === c.value ? "active" : ""}`}
+            onClick={() => setCategoryFilter(c.value)}
+          >
+            <img className="chip-img" src={c.img} alt={c.label} />
+            <span className="chip-label">{c.label}</span>
           </div>
         ))}
       </div>
 
+      {/* Filter / Sort Bar */}
+      <div className="filter-bar">
+        <div className="filter-left">
+          <button className="filter-btn">Filter</button>
+          <button className="filter-btn" onClick={() => setCategoryFilter("Men")}>Men</button>
+          <button className="filter-btn" onClick={() => setCategoryFilter("Women")}>Women</button>
+        </div>
+        <select className="sort-select" onChange={e => setSortBy(e.target.value)}>
+          <option value="">Sort By: Recommended</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
+          <option value="rating">Better Rating</option>
+        </select>
+      </div>
+
+      <p className="section-title">
+        {categoryFilter ? `${categoryFilter}'s Fashion` : "All Products"} — {filtered.length} items
+      </p>
+
+      <div className="product-grid" style={{ marginTop: 20 }}>
+        {loading ? (
+          <p style={{ textAlign: "center", padding: 40, gridColumn: "1/-1" }}>Loading...</p>
+        ) : filtered.length === 0 ? (
+          <p style={{ textAlign: "center", padding: 40, gridColumn: "1/-1" }}>No products found 😕</p>
+        ) : (
+          filtered.map(p => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              addToCart={addToCart}
+              toggleWishlist={toggleWishlist}
+              isWishlisted={isWishlisted(p.id)}
+            />
+          ))
+        )}
+      </div>
+
+      <footer className="footer">
+        <div className="footer-grid">
+          <div className="footer-col">
+            <h4>Online Shopping</h4>
+            <a onClick={() => handleNavClick("men")}>Men</a>
+            <a onClick={() => handleNavClick("women")}>Women</a>
+            <a onClick={() => handleNavClick("kids")}>Kids</a>
+            <a onClick={() => handleNavClick("home-living")}>Home & Living</a>
+            <a onClick={() => handleNavClick("beauty")}>Beauty</a>
+          </div>
+          <div className="footer-col">
+            <h4>Customer Policies</h4>
+            <a>Contact Us</a><a>FAQ</a><a>T&C</a><a>Terms of Use</a><a>Track Orders</a>
+          </div>
+          <div className="footer-col">
+            <h4>Experience StyleHub</h4>
+            <a>Download App</a><a>StyleHub Social</a><a>New Arrivals</a>
+          </div>
+          <div className="footer-col">
+            <h4>Keep in Touch</h4>
+            <p>🐦 Twitter</p><p>📘 Facebook</p><p>📸 Instagram</p>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          © 2025 StyleHub — India's Fashion Destination
+        </div>
+      </footer>
     </div>
   );
 }
