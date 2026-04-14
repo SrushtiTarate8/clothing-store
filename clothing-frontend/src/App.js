@@ -13,12 +13,14 @@ import OrdersPage from "./pages/OrdersPage";
 
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import { AuthProvider } from "./AuthContext";
+import { useAuth } from "./AuthContext";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ProfilePage from "./pages/ProfilePage";
 
 // ─── Main Shopping App (wrapped inside Router) ───────────────────────────────
 function ShoppingApp() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
@@ -28,6 +30,20 @@ function ShoppingApp() {
   const [sortBy, setSortBy] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [orderForm, setOrderForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    flat: "",
+    area: "",
+    city: "",
+    state: "",
+    pincode: "",
+    paymentMethod: "cod",
+  });
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderError, setOrderError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,6 +102,86 @@ function ShoppingApp() {
 
   const isWishlisted = (id) => wishlist.some((i) => i.id === id);
 
+  const openOrderForm = () => {
+    setOrderOpen(true);
+    setCartOpen(false);
+    setOrderSuccess(false);
+    setOrderError("");
+  };
+
+  const closeOrderForm = () => {
+    setOrderOpen(false);
+    setOrderSuccess(false);
+    setOrderError("");
+    setOrderForm({
+      name: "",
+      email: "",
+      phone: "",
+      flat: "",
+      area: "",
+      city: "",
+      state: "",
+      pincode: "",
+      paymentMethod: "cod",
+    });
+  };
+
+  const updateOrderField = (field, value) =>
+    setOrderForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleSubmitOrder = async (e) => {
+    e.preventDefault();
+    setOrderError("");
+
+    try {
+      const orderPayload = {
+        userId: user?.userId || null,
+        name: orderForm.name,
+        email: orderForm.email,
+        phone: orderForm.phone,
+        flat: orderForm.flat,
+        area: orderForm.area,
+        city: orderForm.city,
+        state: orderForm.state,
+        pincode: orderForm.pincode,
+        paymentMethod: orderForm.paymentMethod,
+        totalAmount: totalPrice,
+        status: "Pending",
+        items: cart.map((item) => ({
+          productId: item.id,
+          name: item.name,
+          size: item.size || "",
+          price: item.price,
+          quantity: item.quantity,
+          imageUrl: item.imageUrl || "",
+        })),
+      };
+
+      await axios.post("http://localhost:8080/api/orders", orderPayload);
+
+      setOrderSuccess(true);
+      setTimeout(() => {
+        setOrderOpen(false);
+        setOrderSuccess(false);
+        setCart([]);
+        setOrderForm({
+          name: "",
+          email: "",
+          phone: "",
+          flat: "",
+          area: "",
+          city: "",
+          state: "",
+          pincode: "",
+          paymentMethod: "cod",
+        });
+      }, 2200);
+    } catch (err) {
+      console.log(err);
+      setOrderError("Could not place order right now. Please try again.");
+    }
+  };
+
   // ── Derived values ──────────────────────────────────────────────────────────
   const totalPrice = cart.reduce((t, i) => t + i.price * i.quantity, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
@@ -118,6 +214,7 @@ function ShoppingApp() {
     decreaseQty,
     removeFromCart,
     totalPrice,
+    onPlaceOrder: openOrderForm,
   };
 
   const wishlistDrawerProps = {
@@ -128,6 +225,191 @@ function ShoppingApp() {
     addToCart,
   };
 
+  const orderModal = orderOpen ? (
+    <>
+      <div className="cart-overlay" onClick={closeOrderForm} />
+      <div className="order-modal">
+        <div className="order-header">
+          <h2>Checkout</h2>
+          <button className="close-btn" onClick={closeOrderForm}>
+            ✕
+          </button>
+        </div>
+
+        {orderSuccess ? (
+          <div className="order-confirmation">
+            <h3>Order confirmed!</h3>
+            <p>
+              Thanks {orderForm.name || "there"}, your order has been placed.
+            </p>
+            <p>We will email you the order details shortly.</p>
+          </div>
+        ) : (
+          <form className="order-form" onSubmit={handleSubmitOrder}>
+            <div className="field-row">
+              <label htmlFor="order-name">Full Name</label>
+              <input
+                id="order-name"
+                type="text"
+                placeholder="Enter your name"
+                value={orderForm.name}
+                onChange={(e) => updateOrderField("name", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-email">Email</label>
+              <input
+                id="order-email"
+                type="email"
+                placeholder="name@example.com"
+                value={orderForm.email}
+                onChange={(e) => updateOrderField("email", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-phone">Phone</label>
+              <input
+                id="order-phone"
+                type="tel"
+                placeholder="Enter phone number"
+                value={orderForm.phone}
+                onChange={(e) => updateOrderField("phone", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-flat">Flat / House No.</label>
+              <input
+                id="order-flat"
+                type="text"
+                placeholder="Flat no, building name"
+                value={orderForm.flat}
+                onChange={(e) => updateOrderField("flat", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-area">Area / Street</label>
+              <textarea
+                id="order-area"
+                rows="3"
+                placeholder="Street, locality, landmark"
+                value={orderForm.area}
+                onChange={(e) => updateOrderField("area", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-city">City</label>
+              <input
+                id="order-city"
+                type="text"
+                placeholder="Enter city"
+                value={orderForm.city}
+                onChange={(e) => updateOrderField("city", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-state">State</label>
+              <input
+                id="order-state"
+                type="text"
+                placeholder="Enter state"
+                value={orderForm.state}
+                onChange={(e) => updateOrderField("state", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label htmlFor="order-pincode">Pincode</label>
+              <input
+                id="order-pincode"
+                type="text"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                inputMode="numeric"
+                placeholder="6-digit pincode"
+                value={orderForm.pincode}
+                onChange={(e) =>
+                  updateOrderField(
+                    "pincode",
+                    e.target.value.replace(/[^0-9]/g, "").slice(0, 6)
+                  )
+                }
+                required
+              />
+            </div>
+
+            <div className="field-row">
+              <label>Payment Method</label>
+              <div className="payment-row">
+                <label
+                  className={`payment-option ${
+                    orderForm.paymentMethod === "cod" ? "active" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="cod"
+                    checked={orderForm.paymentMethod === "cod"}
+                    onChange={() => updateOrderField("paymentMethod", "cod")}
+                  />
+                  Cash on Delivery
+                </label>
+                <label
+                  className={`payment-option ${
+                    orderForm.paymentMethod === "upi" ? "active" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="upi"
+                    checked={orderForm.paymentMethod === "upi"}
+                    onChange={() => updateOrderField("paymentMethod", "upi")}
+                  />
+                  UPI
+                </label>
+              </div>
+            </div>
+
+            {orderForm.paymentMethod === "upi" && (
+              <div className="qr-section">
+                <p>Scan this QR code with any UPI app</p>
+                <img
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://www.google.com"
+                  alt="UPI QR Code"
+                />
+                <p className="qr-hint">
+                  This is a placeholder QR code. Use it to mimic UPI payment.
+                </p>
+              </div>
+            )}
+
+            {orderError && <p className="order-error">{orderError}</p>}
+
+            <button className="checkout-btn" type="submit">
+              {orderForm.paymentMethod === "upi"
+                ? "Pay & Confirm"
+                : "Confirm Order"}
+            </button>
+          </form>
+        )}
+      </div>
+    </>
+  ) : null;
+
   // ── Category pages (non-home) ───────────────────────────────────────────────
   if (activePage !== "home") {
     return (
@@ -136,6 +418,7 @@ function ShoppingApp() {
         <Navbar {...navbarProps} />
         <CartDrawer {...drawerProps} />
         <WishlistDrawer {...wishlistDrawerProps} />
+        {orderModal}
         <CategoryPage
           category={activePage}
           products={products}
@@ -206,6 +489,7 @@ function ShoppingApp() {
 
       <CartDrawer {...drawerProps} />
       <WishlistDrawer {...wishlistDrawerProps} />
+      {orderModal}
 
       {/* Trending Banners */}
       <section className="trending-section">

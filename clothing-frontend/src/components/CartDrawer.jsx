@@ -7,7 +7,8 @@ function CartDrawer({
   increaseQty,
   decreaseQty,
   removeFromCart,
-  totalPrice
+  totalPrice,
+  onPlaceOrder,
 }) {
   if (!cartOpen) return null;
  
@@ -79,7 +80,9 @@ function CartDrawer({
               <span>Total Amount</span>
               <span>₹{totalPrice}</span>
             </div>
-            <button className="checkout-btn">Place Order</button>
+            <button className="checkout-btn" onClick={onPlaceOrder}>
+              Place Order
+            </button>
           </div>
         )}
       </div>
